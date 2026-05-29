@@ -10,6 +10,7 @@
 ## Overview
 
 Building a production-ready ASP.NET Core 9 authentication service with:
+
 - ✅ User Registration & Login
 - ✅ JWT + Refresh Token Management
 - ✅ Email Verification
@@ -40,6 +41,7 @@ dotnet-auth-service/
 ## Implementation Phases
 
 ### Phase 1: Project Setup & Foundation
+
 **Status:** ✅ COMPLETED
 
 - [x] **scaffold-solution** - Create solution and all projects with proper references
@@ -49,7 +51,8 @@ dotnet-auth-service/
 **Phase 1 Documentation:** See [`docs/Phase-1-Project-Setup-and-Foundation/README.md`](Phase-1-Project-Setup-and-Foundation/README.md)
 
 ### Phase 2: Application Core
-**Status:** ⏳ PENDING
+
+**Status:** 🔄 IN PROGRESS - Documentation Complete
 
 - [ ] **application-layer** - Create interfaces, DTOs, validators, and AuthService
   - Interfaces: IAuthService, ITokenService, IEmailSender, IUserRepository
@@ -57,19 +60,25 @@ dotnet-auth-service/
   - Validators: FluentValidation for all requests
   - Services: AuthService with business logic
 
+**Phase 2 Documentation:** See [`docs/Phase-2-Application-Core/`](Phase-2-Application-Core/):
+
+- [`README.md`](Phase-2-Application-Core/README.md) - Complete phase guide
+- [`IMPLEMENTATION-GUIDE.md`](Phase-2-Application-Core/IMPLEMENTATION-GUIDE.md) - Step-by-step reference
+- [`TECHNICAL-SPECS.md`](Phase-2-Application-Core/TECHNICAL-SPECS.md) - Detailed specifications
+- [`ARCHITECTURE-DECISIONS.md`](Phase-2-Application-Core/ARCHITECTURE-DECISIONS.md) - Design rationale
+
 ### Phase 3: Infrastructure & Persistence
+
 **Status:** ⏳ PENDING
 
 - [ ] **infrastructure-persistence** - EF Core 9 + SQL Server setup
   - AppDbContext configuration
   - UserRepository implementation
   - EF Core migrations
-  
 - [ ] **infrastructure-identity** - JWT Token Management
   - TokenService: Generate/Validate JWT access tokens
   - Refresh token generation and validation
   - Token revocation
-  
 - [ ] **infrastructure-email** - Configurable Email Providers
   - SmtpEmailSender (SMTP via MailKit)
   - SendGridEmailSender (SendGrid API)
@@ -77,6 +86,7 @@ dotnet-auth-service/
   - EmailSenderFactory for provider selection
 
 ### Phase 4: API & Controllers
+
 **Status:** ⏳ PENDING
 
 - [ ] **api-controller** - AuthController with 6 endpoints
@@ -86,7 +96,6 @@ dotnet-auth-service/
   - POST /api/auth/verify-email
   - POST /api/auth/forgot-password
   - POST /api/auth/reset-password
-  
 - [ ] **api-middleware** - Global setup
   - ExceptionHandlingMiddleware
   - JWT authentication configuration
@@ -94,19 +103,20 @@ dotnet-auth-service/
   - Program.cs configuration
 
 ### Phase 5: Testing & Quality Assurance
+
 **Status:** ⏳ PENDING
 
 - [ ] **unit-tests** - Business logic testing
   - AuthService method tests (xUnit + Moq)
   - Validator tests
   - TokenService tests
-  
 - [ ] **integration-tests** - End-to-end API testing
   - AuthController endpoint tests
   - Database integration tests
   - WebApplicationFactory setup
 
 ### Phase 6: Documentation & Finalization
+
 **Status:** ⏳ PENDING
 
 - [ ] **docs** - Comprehensive documentation
@@ -149,6 +159,7 @@ dotnet-auth-service/
 ```
 
 **Provider Options:**
+
 - `"Smtp"` - SMTP via MailKit
 - `"SendGrid"` - SendGrid API
 - `"Stub"` - Development/Testing (logs to console)
@@ -157,24 +168,26 @@ dotnet-auth-service/
 
 ## API Endpoints
 
-| HTTP | Endpoint | Description | Auth Required |
-|------|----------|-------------|----------------|
-| POST | `/api/auth/register` | Register new user + send verification email | No |
-| POST | `/api/auth/login` | Login with email & password → JWT + refresh token | No |
-| POST | `/api/auth/refresh-token` | Get new access token using refresh token | No |
-| POST | `/api/auth/verify-email` | Verify email with token | No |
-| POST | `/api/auth/forgot-password` | Request password reset email | No |
-| POST | `/api/auth/reset-password` | Reset password with token | No |
+| HTTP | Endpoint                    | Description                                       | Auth Required |
+| ---- | --------------------------- | ------------------------------------------------- | ------------- |
+| POST | `/api/auth/register`        | Register new user + send verification email       | No            |
+| POST | `/api/auth/login`           | Login with email & password → JWT + refresh token | No            |
+| POST | `/api/auth/refresh-token`   | Get new access token using refresh token          | No            |
+| POST | `/api/auth/verify-email`    | Verify email with token                           | No            |
+| POST | `/api/auth/forgot-password` | Request password reset email                      | No            |
+| POST | `/api/auth/reset-password`  | Reset password with token                         | No            |
 
 ---
 
 ## Key Technologies & Packages
 
 ### Domain & Application
+
 - **FluentValidation** - Request validation
 - **BCrypt.Net-Next** - Password hashing
 
 ### Infrastructure
+
 - **Entity Framework Core 9** - ORM
 - **Microsoft.Data.SqlClient** - SQL Server driver
 - **System.IdentityModel.Tokens.Jwt** - JWT creation
@@ -182,6 +195,7 @@ dotnet-auth-service/
 - **SendGrid** - SendGrid API integration
 
 ### Testing
+
 - **xUnit** - Test framework
 - **Moq** - Mocking library
 - **FluentAssertions** - Assertion library
@@ -194,6 +208,7 @@ dotnet-auth-service/
 ### Database Schema
 
 **Users Table**
+
 ```sql
 CREATE TABLE Users (
     Id UNIQUEIDENTIFIER PRIMARY KEY,
@@ -210,6 +225,7 @@ CREATE TABLE Users (
 ```
 
 **RefreshTokens Table**
+
 ```sql
 CREATE TABLE RefreshTokens (
     Id UNIQUEIDENTIFIER PRIMARY KEY,
@@ -222,6 +238,7 @@ CREATE TABLE RefreshTokens (
 ```
 
 ### Security Considerations
+
 - ✅ Passwords hashed with BCrypt
 - ✅ JWT tokens signed with secret key
 - ✅ Refresh tokens stored in database
@@ -231,6 +248,7 @@ CREATE TABLE RefreshTokens (
 - ✅ CORS configuration (configure per environment)
 
 ### Error Handling
+
 - Custom exception types (AuthException, ValidationException)
 - Global exception middleware for consistent responses
 - Problem Details RFC 7807 compliant responses
@@ -239,15 +257,15 @@ CREATE TABLE RefreshTokens (
 
 ## Progress Tracking
 
-| Phase | Tasks | Completed | Status |
-|-------|-------|-----------|--------|
-| 1 | 3 | 3 | ✅ COMPLETED |
-| 2 | 1 | 0 | 🔄 In Progress |
-| 3 | 3 | 0 | ⏳ Pending |
-| 4 | 2 | 0 | ⏳ Pending |
-| 5 | 2 | 0 | ⏳ Pending |
-| 6 | 1 | 0 | ⏳ Pending |
-| **TOTAL** | **12** | **3** | **25%** |
+| Phase     | Tasks  | Completed | Status         |
+| --------- | ------ | --------- | -------------- |
+| 1         | 3      | 3         | ✅ COMPLETED   |
+| 2         | 1      | 0         | 🔄 In Progress |
+| 3         | 3      | 0         | ⏳ Pending     |
+| 4         | 2      | 0         | ⏳ Pending     |
+| 5         | 2      | 0         | ⏳ Pending     |
+| 6         | 1      | 0         | ⏳ Pending     |
+| **TOTAL** | **12** | **3**     | **25%**        |
 
 ---
 
@@ -279,4 +297,4 @@ CREATE TABLE RefreshTokens (
 
 ---
 
-*For detailed implementation progress, see individual phase documentation files.*
+_For detailed implementation progress, see individual phase documentation files._

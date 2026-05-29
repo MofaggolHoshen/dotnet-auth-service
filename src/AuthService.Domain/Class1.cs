@@ -1,6 +1,2 @@
-﻿namespace AuthService.Domain;
+// Domain placeholder - see Entities/ and Enums/ folders
 
-public class Class1
-{
-
-}
