@@ -1,4 +1,4 @@
-using BCrypt.Net;
+using BCrypt;
 using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Application.Interfaces;
@@ -36,7 +36,7 @@ namespace AuthService.Application.Services
             }
 
             // Hash password and create user
-            var passwordHash = BCrypt.BCrypt.HashPassword(request.Password);
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, 11);
             var emailVerificationToken = GenerateToken();
 
             var user = new User
@@ -78,7 +78,7 @@ namespace AuthService.Application.Services
             }
 
             // Verify password
-            if (!BCrypt.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 return new AuthResponse
                 {
@@ -116,20 +116,9 @@ namespace AuthService.Application.Services
 
         public async Task<AuthResponse> RefreshTokenAsync(RefreshTokenRequest request)
         {
-            // Validate token isn't revoked
-            var isRevoked = await _tokenService.IsTokenRevokedAsync(Guid.Empty, request.RefreshToken);
-            if (isRevoked)
-            {
-                return new AuthResponse
-                {
-                    Success = false,
-                    Message = "Invalid refresh token"
-                };
-            }
-
-            // Validate token and extract claims
-            var principal = _tokenService.ValidateToken(request.RefreshToken);
-            if (principal == null)
+            // Look up user by refresh token in the database
+            var user = await _userRepository.GetByRefreshTokenAsync(request.RefreshToken);
+            if (user == null)
             {
                 return new AuthResponse
                 {
@@ -138,29 +127,10 @@ namespace AuthService.Application.Services
                 };
             }
 
-            var userIdClaim = principal.FindFirst("sub")?.Value;
-            var emailClaim = principal.FindFirst("email")?.Value;
-
-            if (string.IsNullOrEmpty(userIdClaim) || string.IsNullOrEmpty(emailClaim))
-            {
-                return new AuthResponse
-                {
-                    Success = false,
-                    Message = "Invalid token claims"
-                };
-            }
-
-            if (!Guid.TryParse(userIdClaim, out var userId))
-            {
-                return new AuthResponse
-                {
-                    Success = false,
-                    Message = "Invalid user ID in token"
-                };
-            }
-
-            // Generate new access token
-            var newAccessToken = _tokenService.GenerateAccessToken(userId, emailClaim);
+            // Revoke old token and generate new ones
+            await _tokenService.RevokeTokenAsync(user.Id, request.RefreshToken);
+            var newAccessToken = _tokenService.GenerateAccessToken(user.Id, user.Email);
+            var newRefreshToken = _tokenService.GenerateRefreshToken();
 
             return new AuthResponse
             {
@@ -169,7 +139,7 @@ namespace AuthService.Application.Services
                 Token = new AuthToken
                 {
                     AccessToken = newAccessToken,
-                    RefreshToken = request.RefreshToken,
+                    RefreshToken = newRefreshToken,
                     ExpiresInMinutes = 15
                 }
             };
@@ -248,7 +218,7 @@ namespace AuthService.Application.Services
             }
 
             // Update password
-            user.PasswordHash = BCrypt.BCrypt.HashPassword(request.NewPassword);
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, 11);
             user.PasswordResetToken = null;
             user.PasswordResetTokenExpiry = null;
             user.UpdatedAt = DateTime.UtcNow;
