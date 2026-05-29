@@ -60,6 +60,21 @@ public class TokenService : ITokenService
         return Convert.ToBase64String(randomNumber);
     }
 
+    public async Task StoreRefreshTokenAsync(Guid userId, string refreshToken)
+    {
+        var token = new Domain.Entities.RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Token = refreshToken,
+            IsRevoked = false,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.RefreshTokens.Add(token);
+        await _context.SaveChangesAsync();
+    }
+
     public ClaimsPrincipal? ValidateToken(string token)
     {
         try

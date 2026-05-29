@@ -116,11 +116,12 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Apply migrations on startup
+// Apply migrations on startup (skip for in-memory / test providers)
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.Migrate();
+    if (dbContext.Database.IsRelational())
+        dbContext.Database.Migrate();
 }
 
 // Configure the HTTP request pipeline.
@@ -139,3 +140,5 @@ app.MapControllers();
 
 app.Run();
 
+// Expose Program class for integration test WebApplicationFactory
+public partial class Program { }

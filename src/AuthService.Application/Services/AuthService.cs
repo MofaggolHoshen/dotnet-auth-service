@@ -97,9 +97,10 @@ namespace AuthService.Application.Services
                 };
             }
 
-            // Generate tokens
+            // Generate and store tokens
             var accessToken = _tokenService.GenerateAccessToken(user.Id, user.Email);
             var refreshToken = _tokenService.GenerateRefreshToken();
+            await _tokenService.StoreRefreshTokenAsync(user.Id, refreshToken);
 
             return new AuthResponse
             {
@@ -131,6 +132,7 @@ namespace AuthService.Application.Services
             await _tokenService.RevokeTokenAsync(user.Id, request.RefreshToken);
             var newAccessToken = _tokenService.GenerateAccessToken(user.Id, user.Email);
             var newRefreshToken = _tokenService.GenerateRefreshToken();
+            await _tokenService.StoreRefreshTokenAsync(user.Id, newRefreshToken);
 
             return new AuthResponse
             {

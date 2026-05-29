@@ -57,8 +57,44 @@ public class AuthServiceTests
         });
 
         result.Success.Should().BeTrue();
+        result.Message.Should().Contain("verify your email");
         _userRepoMock.Verify(r => r.AddAsync(It.IsAny<User>()), Times.Once);
         _emailSenderMock.Verify(e => e.SendEmailVerificationAsync("new@example.com", It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WhenEmailIsNew_StoresHashedPassword()
+    {
+        User? savedUser = null;
+        _userRepoMock.Setup(r => r.ExistsByEmailAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _userRepoMock.Setup(r => r.AddAsync(It.IsAny<User>()))
+            .Callback<User>(u => savedUser = u)
+            .Returns(Task.CompletedTask);
+        _emailSenderMock.Setup(e => e.SendEmailVerificationAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        await _sut.RegisterAsync(new RegisterRequest { Email = "new@example.com", Password = "Password1!" });
+
+        savedUser.Should().NotBeNull();
+        savedUser!.PasswordHash.Should().NotBe("Password1!");
+        BCrypt.Net.BCrypt.Verify("Password1!", savedUser.PasswordHash).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WhenEmailIsNew_SetsEmailVerificationToken()
+    {
+        User? savedUser = null;
+        _userRepoMock.Setup(r => r.ExistsByEmailAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _userRepoMock.Setup(r => r.AddAsync(It.IsAny<User>()))
+            .Callback<User>(u => savedUser = u)
+            .Returns(Task.CompletedTask);
+        _emailSenderMock.Setup(e => e.SendEmailVerificationAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        await _sut.RegisterAsync(new RegisterRequest { Email = "new@example.com", Password = "Password1!" });
+
+        savedUser!.EmailVerificationToken.Should().NotBeNullOrEmpty();
+        savedUser.IsEmailVerified.Should().BeFalse();
     }
 
     // ── LoginAsync ─────────────────────────────────────────────────────────────
@@ -72,6 +108,22 @@ public class AuthServiceTests
         {
             Email = "nobody@example.com",
             Password = "Password1!"
+        });
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("Invalid email or password");
+    }
+
+    [Fact]
+    public async Task LoginAsync_WhenPasswordWrong_ReturnsFalse()
+    {
+        var user = MakeVerifiedUser();
+        _userRepoMock.Setup(r => r.GetByEmailAsync(user.Email)).ReturnsAsync(user);
+
+        var result = await _sut.LoginAsync(new LoginRequest
+        {
+            Email = user.Email,
+            Password = "WrongPassword1!"
         });
 
         result.Success.Should().BeFalse();
@@ -101,6 +153,7 @@ public class AuthServiceTests
         _userRepoMock.Setup(r => r.GetByEmailAsync(user.Email)).ReturnsAsync(user);
         _tokenServiceMock.Setup(t => t.GenerateAccessToken(user.Id, user.Email)).Returns("access_token");
         _tokenServiceMock.Setup(t => t.GenerateRefreshToken()).Returns("refresh_token");
+        _tokenServiceMock.Setup(t => t.StoreRefreshTokenAsync(user.Id, "refresh_token")).Returns(Task.CompletedTask);
 
         var result = await _sut.LoginAsync(new LoginRequest
         {
@@ -112,6 +165,38 @@ public class AuthServiceTests
         result.Token.Should().NotBeNull();
         result.Token!.AccessToken.Should().Be("access_token");
         result.Token.RefreshToken.Should().Be("refresh_token");
+        result.Token.ExpiresInMinutes.Should().Be(15);
+    }
+
+    // ── RefreshTokenAsync ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RefreshTokenAsync_WhenTokenNotFound_ReturnsFalse()
+    {
+        _userRepoMock.Setup(r => r.GetByRefreshTokenAsync(It.IsAny<string>())).ReturnsAsync((User?)null);
+
+        var result = await _sut.RefreshTokenAsync(new RefreshTokenRequest { RefreshToken = "invalid_token" });
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("Invalid or expired");
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WhenTokenValid_RevokesOldAndReturnsNewTokens()
+    {
+        var user = MakeVerifiedUser();
+        _userRepoMock.Setup(r => r.GetByRefreshTokenAsync("old_token")).ReturnsAsync(user);
+        _tokenServiceMock.Setup(t => t.RevokeTokenAsync(user.Id, "old_token")).ReturnsAsync(true);
+        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user.Id, user.Email)).Returns("new_access");
+        _tokenServiceMock.Setup(t => t.GenerateRefreshToken()).Returns("new_refresh");
+        _tokenServiceMock.Setup(t => t.StoreRefreshTokenAsync(user.Id, "new_refresh")).Returns(Task.CompletedTask);
+
+        var result = await _sut.RefreshTokenAsync(new RefreshTokenRequest { RefreshToken = "old_token" });
+
+        result.Success.Should().BeTrue();
+        result.Token!.AccessToken.Should().Be("new_access");
+        result.Token.RefreshToken.Should().Be("new_refresh");
+        _tokenServiceMock.Verify(t => t.RevokeTokenAsync(user.Id, "old_token"), Times.Once);
     }
 
     // ── VerifyEmailAsync ───────────────────────────────────────────────────────
@@ -127,7 +212,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task VerifyEmailAsync_WhenTokenValid_VerifiesEmail()
+    public async Task VerifyEmailAsync_WhenTokenValid_VerifiesEmailAndClearsToken()
     {
         var user = MakeUser(isEmailVerified: false, emailVerificationToken: "validtoken");
         _userRepoMock.Setup(r => r.GetByEmailVerificationTokenAsync("validtoken")).ReturnsAsync(user);
@@ -136,7 +221,8 @@ public class AuthServiceTests
         var result = await _sut.VerifyEmailAsync(new VerifyEmailRequest { Token = "validtoken" });
 
         result.Success.Should().BeTrue();
-        _userRepoMock.Verify(r => r.UpdateAsync(It.Is<User>(u => u.IsEmailVerified)), Times.Once);
+        _userRepoMock.Verify(r => r.UpdateAsync(It.Is<User>(u =>
+            u.IsEmailVerified && u.EmailVerificationToken == null)), Times.Once);
     }
 
     // ── ForgotPasswordAsync ────────────────────────────────────────────────────
@@ -165,6 +251,24 @@ public class AuthServiceTests
 
         result.Success.Should().BeTrue();
         _emailSenderMock.Verify(e => e.SendPasswordResetAsync(user.Email, It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_WhenEmailExists_SetsResetTokenWithExpiry()
+    {
+        var user = MakeVerifiedUser();
+        User? updatedUser = null;
+        _userRepoMock.Setup(r => r.GetByEmailAsync(user.Email)).ReturnsAsync(user);
+        _userRepoMock.Setup(r => r.UpdateAsync(It.IsAny<User>()))
+            .Callback<User>(u => updatedUser = u)
+            .Returns(Task.CompletedTask);
+        _emailSenderMock.Setup(e => e.SendPasswordResetAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        await _sut.ForgotPasswordAsync(new ForgotPasswordRequest { Email = user.Email });
+
+        updatedUser!.PasswordResetToken.Should().NotBeNullOrEmpty();
+        updatedUser.PasswordResetTokenExpiry.Should().BeCloseTo(DateTime.UtcNow.AddHours(1), TimeSpan.FromMinutes(1));
     }
 
     // ── ResetPasswordAsync ─────────────────────────────────────────────────────
@@ -202,13 +306,16 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task ResetPasswordAsync_WhenTokenValid_UpdatesPassword()
+    public async Task ResetPasswordAsync_WhenTokenValid_UpdatesHashedPasswordAndClearsToken()
     {
         var user = MakeUser();
         user.PasswordResetToken = "validtoken";
         user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+        User? updatedUser = null;
         _userRepoMock.Setup(r => r.GetByPasswordResetTokenAsync("validtoken")).ReturnsAsync(user);
-        _userRepoMock.Setup(r => r.UpdateAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
+        _userRepoMock.Setup(r => r.UpdateAsync(It.IsAny<User>()))
+            .Callback<User>(u => updatedUser = u)
+            .Returns(Task.CompletedTask);
 
         var result = await _sut.ResetPasswordAsync(new ResetPasswordRequest
         {
@@ -217,7 +324,9 @@ public class AuthServiceTests
         });
 
         result.Success.Should().BeTrue();
-        _userRepoMock.Verify(r => r.UpdateAsync(It.IsAny<User>()), Times.Once);
+        updatedUser!.PasswordResetToken.Should().BeNull();
+        updatedUser.PasswordResetTokenExpiry.Should().BeNull();
+        BCrypt.Net.BCrypt.Verify("NewPassword1!", updatedUser.PasswordHash).Should().BeTrue();
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

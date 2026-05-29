@@ -6,6 +6,7 @@ namespace AuthService.Application.Interfaces
     {
         string GenerateAccessToken(Guid userId, string email);
         string GenerateRefreshToken();
+        Task StoreRefreshTokenAsync(Guid userId, string refreshToken);
         ClaimsPrincipal? ValidateToken(string token);
         Task<bool> RevokeTokenAsync(Guid userId, string refreshToken);
         Task<bool> IsTokenRevokedAsync(Guid userId, string refreshToken);
