@@ -1,6 +1,2 @@
-﻿namespace AuthService.Application;
+// Application placeholder - see Interfaces/, DTOs/, Validators/, Services/ folders
 
-public class Class1
-{
-
-}
