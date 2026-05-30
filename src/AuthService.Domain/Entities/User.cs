@@ -14,7 +14,7 @@ namespace AuthService.Domain.Entities
         public UserStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        
+
         // Navigation properties
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     }
